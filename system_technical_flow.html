@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drone Detection System — Code Flow</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600;700&family=Barlow+Condensed:wght@400;600;700&display=swap');
+
+  :root {
+    --bg:        #080c10;
+    --panel:     #0d1117;
+    --border:    #1e2a38;
+    --accent:    #00d4ff;
+    --accent2:   #00ff9d;
+    --accent3:   #ff6b35;
+    --warn:      #ffd166;
+    --muted:     #4a6070;
+    --text:      #c8d8e8;
+    --text-dim:  #6a8090;
+    --cv:        #0066cc;
+    --cv-light:  #1a8cff;
+    --yolo:      #cc3300;
+    --yolo-light:#ff5533;
+    --kalman:    #006633;
+    --kalman-light:#00cc66;
+    --pos:       #663399;
+    --pos-light: #aa55ff;
+    --sys:       #336655;
+    --sys-light: #55aa88;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    font-family: 'Barlow', sans-serif;
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Grid background ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 32px 80px;
+  }
+
+  /* ── Header ── */
+  .header {
+    text-align: center;
+    margin-bottom: 56px;
+  }
+  .header .tag {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    opacity: 0.8;
+  }
+  .header h1 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+  .header h1 span { color: var(--accent); }
+  .header .sub {
+    font-size: 14px;
+    color: var(--text-dim);
+    font-weight: 300;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 48px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--text-dim);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 5px 12px;
+    border-radius: 4px;
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ── Section labels ── */
+  .flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .phase-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 32px 0 12px 4px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .phase-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── Nodes ── */
+  .row {
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .row.center { justify-content: center; }
+  .row.triple { justify-content: center; }
+
+  .node {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    position: relative;
+    transition: border-color 0.2s;
+    max-width: 340px;
+  }
+  .node:hover { border-color: var(--accent); }
+
+  .node.wide  { max-width: 720px; flex: 1; }
+  .node.full  { max-width: 100%; flex: 1; }
+  .node.sm    { max-width: 220px; }
+
+  /* Color accents by component type */
+  .node.cv     { border-left: 3px solid var(--cv-light); }
+  .node.yolo   { border-left: 3px solid var(--yolo-light); }
+  .node.kalman { border-left: 3px solid var(--kalman-light); }
+  .node.pos    { border-left: 3px solid var(--pos-light); }
+  .node.sys    { border-left: 3px solid var(--sys-light); }
+  .node.hw     { border-left: 3px solid var(--warn); }
+  .node.alert  { border-left: 3px solid var(--accent3); }
+  .node.output { border-left: 3px solid var(--accent2); }
+  .node.core   { border-left: 3px solid var(--accent); }
+
+  .node-section {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+  }
+  .node-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 6px;
+    letter-spacing: 0.3px;
+  }
+  .node-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.55;
+  }
+  .node-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 9px;
+  }
+  .tag-pill {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  .tag-pill.cv     { color: var(--cv-light);     border-color: rgba(26,140,255,0.3); }
+  .tag-pill.yolo   { color: var(--yolo-light);   border-color: rgba(255,85,51,0.3); }
+  .tag-pill.kalman { color: var(--kalman-light); border-color: rgba(0,204,102,0.3); }
+  .tag-pill.pos    { color: var(--pos-light);    border-color: rgba(170,85,255,0.3); }
+  .tag-pill.sys    { color: var(--sys-light);    border-color: rgba(85,170,136,0.3); }
+  .tag-pill.warn   { color: var(--warn);         border-color: rgba(255,209,102,0.3); }
+  .tag-pill.accent { color: var(--accent);       border-color: rgba(0,212,255,0.3); }
+  .tag-pill.accent2{ color: var(--accent2);      border-color: rgba(0,255,157,0.3); }
+  .tag-pill.accent3{ color: var(--accent3);      border-color: rgba(255,107,53,0.3); }
+
+  /* ── Arrows ── */
+  .arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 0;
+    gap: 8px;
+  }
+  .arrow-line {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .arrow svg { opacity: 0.5; }
+  .arrow-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    background: var(--bg);
+    padding: 0 8px;
+  }
+
+  /* ── Split arrow (one to two) ── */
+  .split-arrow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+  .split-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .split-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  /* ── Merge arrow (two to one) ── */
+  .merge-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 0;
+    margin: 4px 0;
+    padding: 0 20px;
+  }
+  .merge-line {
+    height: 2px;
+    background: linear-gradient(to right, transparent, var(--border));
+  }
+  .merge-line.right {
+    background: linear-gradient(to left, transparent, var(--border));
+  }
+  .merge-down {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ── Pipeline row (horizontal mini flow) ── */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 20px;
+    overflow-x: auto;
+  }
+  .pipe-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .pipe-step .pipe-icon {
+    width: 36px; height: 36px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    margin-bottom: 5px;
+  }
+  .pipe-step .pipe-name {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+    max-width: 70px;
+    line-height: 1.3;
+  }
+  .pipe-arrow {
+    flex-shrink: 0;
+    padding: 0 8px;
+    color: var(--muted);
+    font-size: 18px;
+    padding-bottom: 20px;
+  }
+
+  /* ── Dual stream container ── */
+  .dual-stream {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .stream-col {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .stream-header {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-align: center;
+    padding: 6px;
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 4px;
+    background: rgba(0,212,255,0.04);
+  }
+
+  /* divider */
+  .divider {
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--border), transparent);
+    margin: 8px 0;
+  }
+
+  /* info box */
+  .info-box {
+    background: rgba(0,212,255,0.04);
+    border: 1px solid rgba(0,212,255,0.15);
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    margin: 4px 0;
+  }
+  .info-box strong { color: var(--accent); font-weight: 600; }
+
+  /* connector lines between sections */
+  .connector {
+    display: flex;
+    justify-content: center;
+    margin: 2px 0;
+  }
+  .connector svg { opacity: 0.35; }
+
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="tag">// EE Senior Project — Jetson Nano Orin</div>
+    <h1>Drone Detection & Tracking System <span>—</span> Code Flow</h1>
+    <div class="sub">Dual CSI Camera · YOLOv11 TensorRT · Kalman Filter · Position Estimation</div>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--warn)"></div>Hardware / OS</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--cv-light)"></div>OpenCV / GStreamer</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--yolo-light)"></div>Ultralytics / TensorRT</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--kalman-light)"></div>Kalman Filter / Tracker</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--pos-light)"></div>Position Estimator</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div>Pipeline Coordinator</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent3)"></div>Alert System</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent2)"></div>Output / Logging</div>
+  </div>
+
+  <div class="flow">
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div class="phase-label">01 — STARTUP & INITIALIZATION</div>
+
+    <!-- Startup checks -->
+    <div class="row center">
+      <div class="node core wide">
+        <div class="node-section">SECTION 19 · ENTRY POINT</div>
+        <div class="node-title">main() — Program Entry</div>
+        <div class="node-desc">Parses CLI arguments · Configures logging · Prints system banner · Hands off to startup checks</div>
+        <div class="node-tags">
+          <span class="tag-pill accent">argparse</span>
+          <span class="tag-pill">logging</span>
+          <span class="tag-pill">sys</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector">
+      <svg width="2" height="28"><line x1="1" y1="0" x2="1" y2="28" stroke="#1e2a38" stroke-width="2" stroke-dasharray="4,3"/></svg>
+    </div>
+
+    <div class="row center">
+      <div class="node core wide">
+        <div class="node-section">SECTION 17 · STARTUP CHECKS</div>
+        <div class="node-title">run_all_startup_checks()</div>
+        <div class="node-desc">① Check GPU / CUDA available &nbsp;② Check both CSI cameras detected &nbsp;③ Verify .engine model file exists &nbsp;④ Create output directories &nbsp;⑤ Verify Python dependencies</div>
+        <div class="node-tags">
+          <span class="tag-pill warn">torch.cuda</span>
+          <span class="tag-pill cv">cv2</span>
+          <span class="tag-pill yolo">ultralytics</span>
+          <span class="tag-pill">os / pathlib</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector">
+      <svg width="2" height="28"><line x1="1" y1="0" x2="1" y2="28" stroke="#1e2a38" stroke-width="2" stroke-dasharray="4,3"/></svg>
+    </div>
+
+    <!-- Component init -->
+    <div class="row center">
+      <div class="node core wide">
+        <div class="node-section">SECTION 15.1 · PIPELINE INIT</div>
+        <div class="node-title">DetectionPipeline — Instantiate All Components</div>
+        <div class="node-desc">Creates and links every system component before any frames are processed</div>
+        <div class="node-tags">
+          <span class="tag-pill accent">threading</span>
+          <span class="tag-pill accent">queue</span>
+          <span class="tag-pill">dataclasses</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Component boxes -->
+    <div class="row" style="margin-top:10px; flex-wrap:wrap; justify-content:center; gap:10px; max-width:900px; margin-left:auto; margin-right:auto;">
+      <div class="node cv sm">
+        <div class="node-section">§5</div>
+        <div class="node-title" style="font-size:14px">CSICamera ×2</div>
+        <div class="node-desc" style="font-size:11px">One thread per camera. GStreamer pipeline opened.</div>
+        <div class="node-tags"><span class="tag-pill cv">cv2</span><span class="tag-pill cv">GStreamer</span></div>
+      </div>
+      <div class="node yolo sm">
+        <div class="node-section">§6</div>
+        <div class="node-title" style="font-size:14px">DroneDetector</div>
+        <div class="node-desc" style="font-size:11px">Loads .engine, runs TensorRT warmup passes.</div>
+        <div class="node-tags"><span class="tag-pill yolo">YOLO</span><span class="tag-pill yolo">TensorRT</span></div>
+      </div>
+      <div class="node kalman sm">
+        <div class="node-section">§7 §8</div>
+        <div class="node-title" style="font-size:14px">DroneTracker ×2</div>
+        <div class="node-desc" style="font-size:11px">One tracker per camera. Kalman filters initialized.</div>
+        <div class="node-tags"><span class="tag-pill kalman">KalmanFilter</span><span class="tag-pill">scipy</span></div>
+      </div>
+      <div class="node pos sm">
+        <div class="node-section">§9</div>
+        <div class="node-title" style="font-size:14px">PositionEstimator</div>
+        <div class="node-desc" style="font-size:11px">FOV params loaded. Focal length computed.</div>
+        <div class="node-tags"><span class="tag-pill pos">math</span><span class="tag-pill pos">numpy</span></div>
+      </div>
+      <div class="node sys sm">
+        <div class="node-section">§14</div>
+        <div class="node-title" style="font-size:14px">SystemMonitor</div>
+        <div class="node-desc" style="font-size:11px">Background thread polls tegrastats for GPU/CPU/RAM.</div>
+        <div class="node-tags"><span class="tag-pill sys">subprocess</span><span class="tag-pill">threading</span></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div class="phase-label" style="margin-top:40px">02 — MAIN PROCESSING LOOP  <span style="color:var(--accent);font-size:9px;margin-left:6px">↻ RUNS CONTINUOUSLY PER FRAME</span></div>
+
+    <div class="info-box">
+      <strong>Threading model:</strong> Two background threads run simultaneously — one per camera (§15.4). Each thread independently captures frames, runs detection, and runs tracking. Results are placed onto a shared display queue. The main thread (§15.6) reads from both queues and renders the display. This ensures neither camera blocks the other.
+    </div>
+
+    <div style="margin-top:16px; margin-bottom:4px">
+      <div class="dual-stream">
+        <div class="stream-col">
+          <div class="stream-header">◈ CAMERA 0 THREAD &nbsp;(sensor_id = 0)</div>
+        </div>
+        <div class="stream-col">
+          <div class="stream-header">◈ CAMERA 1 THREAD &nbsp;(sensor_id = 1)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 1: Capture -->
+    <div class="dual-stream">
+      <div class="node cv" style="max-width:100%">
+        <div class="node-section">SECTION 5.6 · CAPTURE LOOP</div>
+        <div class="node-title">CSICamera._capture_loop()</div>
+        <div class="node-desc">Background thread continuously reads frames via GStreamer pipeline. Latest frame stored in thread-safe buffer.</div>
+        <div class="node-tags"><span class="tag-pill cv">cv2.VideoCapture</span><span class="tag-pill cv">CAP_GSTREAMER</span><span class="tag-pill">threading.Lock</span></div>
+      </div>
+      <div class="node cv" style="max-width:100%">
+        <div class="node-section">SECTION 5.6 · CAPTURE LOOP</div>
+        <div class="node-title">CSICamera._capture_loop()</div>
+        <div class="node-desc">Background thread continuously reads frames via GStreamer pipeline. Latest frame stored in thread-safe buffer.</div>
+        <div class="node-tags"><span class="tag-pill cv">cv2.VideoCapture</span><span class="tag-pill cv">CAP_GSTREAMER</span><span class="tag-pill">threading.Lock</span></div>
+      </div>
+    </div>
+
+    <div class="dual-stream" style="margin-top:6px">
+      <div class="connector"><svg width="2" height="20"><line x1="1" y1="0" x2="1" y2="20" stroke="#1e2a38" stroke-width="2" stroke-dasharray="3,3"/></svg></div>
+      <div class="connector"><svg width="2" height="20"><line x1="1" y1="0" x2="1" y2="20" stroke="#1e2a38" stroke-width="2" stroke-dasharray="3,3"/></svg></div>
+    </div>
+
+    <!-- STEP 2: Read frame -->
+    <div class="dual-stream">
+      <div class="node cv" style="max-width:100%; border-style:dashed; border-left:3px solid var(--cv-light)">
+        <div class="node-section">SECTION 5.6 · READ</div>
+        <div class="node-title">frame, timestamp = cam0.read()</div>
+        <div class="node-desc">Main pipeline thread reads latest BGR numpy frame from camera buffer. Returns (success, frame, timestamp).</div>
+        <div class="node-tags"><span class="tag-pill cv">numpy array</span><span class="tag-pill">BGR format</span></div>
+      </div>
+      <div class="node cv" style="max-width:100%; border-style:dashed; border-left:3px solid var(--cv-light)">
+        <div class="node-section">SECTION 5.6 · READ</div>
+        <div class="node-title">frame, timestamp = cam1.read()</div>
+        <div class="node-desc">Main pipeline thread reads latest BGR numpy frame from camera buffer. Returns (success, frame, timestamp).</div>
+        <div class="node-tags"><span class="tag-pill cv">numpy array</span><span class="tag-pill">BGR format</span></div>
+      </div>
+    </div>
+
+    <!-- Optional preprocessing note -->
+    <div class="dual-stream" style="margin-top:6px">
+      <div style="background:rgba(26,140,255,0.05); border:1px dashed rgba(26,140,255,0.2); border-radius:6px; padding:8px 12px; font-size:11px; color:var(--text-dim); text-align:center;">
+        <span style="color:var(--cv-light)">Optional OpenCV preprocessing</span><br>ROI crop · Brightness adjust · Denoise
+      </div>
+      <div style="background:rgba(26,140,255,0.05); border:1px dashed rgba(26,140,255,0.2); border-radius:6px; padding:8px 12px; font-size:11px; color:var(--text-dim); text-align:center;">
+        <span style="color:var(--cv-light)">Optional OpenCV preprocessing</span><br>ROI crop · Brightness adjust · Denoise
+      </div>
+    </div>
+
+    <div class="dual-stream" style="margin-top:6px">
+      <div class="connector"><svg width="2" height="20"><line x1="1" y1="0" x2="1" y2="20" stroke="#1e2a38" stroke-width="2" stroke-dasharray="3,3"/></svg></div>
+      <div class="connector"><svg width="2" height="20"><line x1="1" y1="0" x2="1" y2="20" stroke="#1e2a38" stroke-width="2" stroke-dasharray="3,3"/></svg></div>
+    </div>
+
+    <!-- STEP 3: YOLO Detection (shared) -->
+    <div class="row center">
+      <div class="node yolo wide">
+        <div class="node-section">SECTION 6.3 · INFERENCE &nbsp;— SHARED BETWEEN BOTH CAMERAS</div>
+        <div class="node-title">DroneDetector.detect( frame )</div>
+        <div class="node-desc">Passes frame to Ultralytics YOLO, which internally handles all preprocessing (resize→normalize→tensor→GPU). TensorRT runs optimized FP16 inference. Raw result parsed into list of RawDetection objects.</div>
+        <div class="node-tags">
+          <span class="tag-pill yolo">YOLO.predict()</span>
+          <span class="tag-pill yolo">TensorRT engine</span>
+          <span class="tag-pill warn">CUDA GPU</span>
+          <span class="tag-pill">conf threshold</span>
+          <span class="tag-pill">IoU / NMS</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="row center" style="margin-top:6px">
+      <div style="background:rgba(255,85,51,0.06); border:1px solid rgba(255,85,51,0.2); border-radius:6px; padding:10px 24px; font-size:11px; color:var(--text-dim); text-align:center; max-width:720px; width:100%">
+        <span style="color:var(--yolo-light)">Output: List of RawDetection</span> — x1, y1, x2, y2 · confidence · class_id · camera_id · timestamp
+      </div>
+    </div>
+
+    <!-- Split back to two -->
+    <div class="dual-stream" style="margin-top:10px">
+      <div class="connector"><svg width="2" height="20"><line x1="1" y1="0" x2="1" y2="20" stroke="#1e2a38" stroke-width="2" stroke-dasharray="3,3"/></svg></div>
+      <div class="connector"><svg width="2" height="20"><line x1="1" y1="0" x2="1" y2="20" stroke="#1e2a38" stroke-width="2" stroke-dasharray="3,3"/></svg></div>
+    </div>
+
+    <!-- STEP 4: Tracking -->
+    <div class="dual-stream">
+      <div class="node kalman" style="max-width:100%">
+        <div class="node-section">SECTIONS 7 + 8 · TRACKER CAM 0</div>
+        <div class="node-title">DroneTracker.update( detections )</div>
+        <div class="node-desc">① Kalman PREDICT all active tracks &nbsp;② Compute IoU cost matrix &nbsp;③ Hungarian assignment &nbsp;④ Kalman UPDATE matched tracks &nbsp;⑤ Create new tracks for unmatched &nbsp;⑥ Increment disappeared for lost tracks</div>
+        <div class="node-tags"><span class="tag-pill kalman">KalmanFilter</span><span class="tag-pill kalman">scipy.linear_sum</span><span class="tag-pill">numpy</span></div>
+      </div>
+      <div class="node kalman" style="max-width:100%">
+        <div class="node-section">SECTIONS 7 + 8 · TRACKER CAM 1</div>
+        <div class="node-title">DroneTracker.update( detections )</div>
+        <div class="node-desc">① Kalman PREDICT all active tracks &nbsp;② Compute IoU cost matrix &nbsp;③ Hungarian assignment &nbsp;④ Kalman UPDATE matched tracks &nbsp;⑤ Create new tracks for unmatched &nbsp;⑥ Increment disappeared for lost tracks</div>
+        <div class="node-tags"><span class="tag-pill kalman">KalmanFilter</span><span class="tag-pill kalman">scipy.linear_sum</span><span class="tag-pill">numpy</span></div>
+      </div>
+    </div>
+
+    <div class="dual-stream" style="margin-top:6px">
+      <div style="background:rgba(0,204,102,0.05); border:1px solid rgba(0,204,102,0.2); border-radius:6px; padding:8px 12px; font-size:11px; color:var(--text-dim); text-align:center;">
+        <span style="color:var(--kalman-light)">Output: List of TrackedDrone</span><br>+ track_id · state · velocity · predicted_box · trajectory
+      </div>
+      <div style="background:rgba(0,204,102,0.05); border:1px solid rgba(0,204,102,0.2); border-radius:6px; padding:8px 12px; font-size:11px; color:var(--text-dim); text-align:center;">
+        <span style="color:var(--kalman-light)">Output: List of TrackedDrone</span><br>+ track_id · state · velocity · predicted_box · trajectory
+      </div>
+    </div>
+
+    <div class="dual-stream" style="margin-top:6px">
+      <div class="connector"><svg width="2" height="20"><line x1="1" y1="0" x2="1" y2="20" stroke="#1e2a38" stroke-width="2" stroke-dasharray="3,3"/></svg></div>
+      <div class="connector"><svg width="2" height="20"><line x1="1" y1="0" x2="1" y2="20" stroke="#1e2a38" stroke-width="2" stroke-dasharray="3,3"/></svg></div>
+    </div>
+
+    <!-- STEP 5: Position estimation -->
+    <div class="dual-stream">
+      <div class="node pos" style="max-width:100%">
+        <div class="node-section">SECTION 9 · POSITION CAM 0</div>
+        <div class="node-title">PositionEstimator.compute_position()</div>
+        <div class="node-desc">Converts bounding box to azimuth & elevation angles. Estimates distance from apparent drone size. Returns DronePosition object.</div>
+        <div class="node-tags"><span class="tag-pill pos">math.atan2</span><span class="tag-pill pos">numpy</span><span class="tag-pill">FOV params</span></div>
+      </div>
+      <div class="node pos" style="max-width:100%">
+        <div class="node-section">SECTION 9 · POSITION CAM 1</div>
+        <div class="node-title">PositionEstimator.compute_position()</div>
+        <div class="node-desc">Converts bounding box to azimuth & elevation angles. Estimates distance from apparent drone size. Returns DronePosition object.</div>
+        <div class="node-tags"><span class="tag-pill pos">math.atan2</span><span class="tag-pill pos">numpy</span><span class="tag-pill">FOV params</span></div>
+      </div>
+    </div>
+
+    <!-- Stereo fusion -->
+    <div class="connector" style="margin-top:10px">
+      <svg width="2" height="20"><line x1="1" y1="0" x2="1" y2="20" stroke="#1e2a38" stroke-width="2" stroke-dasharray="3,3"/></svg>
+    </div>
+
+    <div class="row center">
+      <div class="node pos wide" style="border-style:dashed">
+        <div class="node-section">SECTION 9.5 · OPTIONAL STEREO FUSION</div>
+        <div class="node-title">estimate_stereo_position() — Cross-Camera Triangulation</div>
+        <div class="node-desc">When both cameras detect the same physical drone, horizontal disparity between the two bounding boxes is used to triangulate a more accurate distance estimate using known camera baseline separation.</div>
+        <div class="node-tags"><span class="tag-pill pos">stereo disparity</span><span class="tag-pill pos">triangulation</span><span class="tag-pill">numpy · math</span></div>
+      </div>
+    </div>
+
+    <!-- Package into DetectionFrame -->
+    <div class="connector" style="margin-top:8px">
+      <svg width="2" height="20"><line x1="1" y1="0" x2="1" y2="20" stroke="#1e2a38" stroke-width="2" stroke-dasharray="3,3"/></svg>
+    </div>
+
+    <div class="row center">
+      <div class="node core wide">
+        <div class="node-section">SECTION 10.4 · DATA PACKAGING</div>
+        <div class="node-title">DetectionFrame — Package All Results</div>
+        <div class="node-desc">Bundles raw frame + annotated frame + RawDetections + TrackedDrones + DronePositions + timing metrics into one object per camera. Placed onto display queue.</div>
+        <div class="node-tags"><span class="tag-pill accent">dataclasses</span><span class="tag-pill">queue.put()</span><span class="tag-pill">numpy</span><span class="tag-pill">datetime</span></div>
+      </div>
+    </div>
+
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div class="phase-label" style="margin-top:40px">03 — DISPLAY LOOP  <span style="color:var(--accent);font-size:9px;margin-left:6px">RUNS ON MAIN THREAD</span></div>
+
+    <div class="row center">
+      <div class="node cv wide">
+        <div class="node-section">SECTION 15.6 · DISPLAY LOOP</div>
+        <div class="node-title">_display_loop() — Read Both Camera Queues</div>
+        <div class="node-desc">Main thread reads DetectionFrame objects from both camera queues. Passes both frames and SystemStatus to visualizer. Calls cv2.imshow() on final rendered frame.</div>
+        <div class="node-tags"><span class="tag-pill cv">queue.get()</span><span class="tag-pill cv">cv2.imshow()</span><span class="tag-pill">threading</span></div>
+      </div>
+    </div>
+
+    <div class="connector">
+      <svg width="2" height="20"><line x1="1" y1="0" x2="1" y2="20" stroke="#1e2a38" stroke-width="2" stroke-dasharray="3,3"/></svg>
+    </div>
+
+    <!-- Visualizer pipeline -->
+    <div class="row center">
+      <div class="node cv wide">
+        <div class="node-section">SECTION 11 · VISUALIZER — render_frame()</div>
+        <div class="node-title">DetectionVisualizer — Full Render Pipeline</div>
+        <div class="node-desc">Applies all drawing passes to both frames in order, then combines them into the final display output.</div>
+      </div>
+    </div>
+
+    <!-- Horizontal mini-pipeline -->
+    <div class="row center" style="margin-top:8px">
+      <div class="pipeline" style="max-width:900px; width:100%">
+        <div class="pipe-step">
+          <div class="pipe-icon" style="background:rgba(26,140,255,0.15)">📦</div>
+          <div class="pipe-name" style="color:var(--cv-light)">Bounding Boxes §11.2</div>
+        </div>
+        <div class="pipe-arrow">›</div>
+        <div class="pipe-step">
+          <div class="pipe-icon" style="background:rgba(26,140,255,0.15)">🏷</div>
+          <div class="pipe-name" style="color:var(--cv-light)">Track Labels §11.3</div>
+        </div>
+        <div class="pipe-arrow">›</div>
+        <div class="pipe-step">
+          <div class="pipe-icon" style="background:rgba(0,204,102,0.15)">➜</div>
+          <div class="pipe-name" style="color:var(--kalman-light)">Velocity Vector §11.4</div>
+        </div>
+        <div class="pipe-arrow">›</div>
+        <div class="pipe-step">
+          <div class="pipe-icon" style="background:rgba(0,204,102,0.15)">〜</div>
+          <div class="pipe-name" style="color:var(--kalman-light)">Trajectory Trail §11.5</div>
+        </div>
+        <div class="pipe-arrow">›</div>
+        <div class="pipe-step">
+          <div class="pipe-icon" style="background:rgba(170,85,255,0.15)">📍</div>
+          <div class="pipe-name" style="color:var(--pos-light)">Position Data §11.6</div>
+        </div>
+        <div class="pipe-arrow">›</div>
+        <div class="pipe-step">
+          <div class="pipe-icon" style="background:rgba(26,140,255,0.15)">🎥</div>
+          <div class="pipe-name" style="color:var(--cv-light)">Camera Info §11.7</div>
+        </div>
+        <div class="pipe-arrow">›</div>
+        <div class="pipe-step">
+          <div class="pipe-icon" style="background:rgba(26,140,255,0.15)">⊞</div>
+          <div class="pipe-name" style="color:var(--cv-light)">Combine Frames §11.10</div>
+        </div>
+        <div class="pipe-arrow">›</div>
+        <div class="pipe-step">
+          <div class="pipe-icon" style="background:rgba(85,170,136,0.15)">📊</div>
+          <div class="pipe-name" style="color:var(--sys-light)">HUD Overlay §11.8</div>
+        </div>
+        <div class="pipe-arrow">›</div>
+        <div class="pipe-step">
+          <div class="pipe-icon" style="background:rgba(255,107,53,0.15)">🚨</div>
+          <div class="pipe-name" style="color:var(--accent3)">Alert Banner §11.9</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector" style="margin-top:8px">
+      <svg width="2" height="20"><line x1="1" y1="0" x2="1" y2="20" stroke="#1e2a38" stroke-width="2" stroke-dasharray="3,3"/></svg>
+    </div>
+
+    <div class="row center">
+      <div class="node cv wide" style="text-align:center; padding:18px">
+        <div class="node-section">FINAL OUTPUT</div>
+        <div class="node-title" style="font-size:20px">cv2.imshow() — Live Display Window</div>
+        <div class="node-desc">Combined 1280×360 dual-camera feed with bounding boxes, track IDs, velocity arrows, trajectory trails, position estimates, HUD, and alert banner.</div>
+        <div class="node-tags" style="justify-content:center; margin-top:10px">
+          <span class="tag-pill cv">cv2.imshow</span>
+          <span class="tag-pill cv">cv2.waitKey</span>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div class="phase-label" style="margin-top:40px">04 — SIDE PROCESSES  <span style="color:var(--accent);font-size:9px;margin-left:6px">RUN IN PARALLEL WITH MAIN LOOP</span></div>
+
+    <div class="row" style="flex-wrap:wrap; justify-content:center; gap:12px">
+
+      <div class="node alert" style="max-width:280px; flex:1">
+        <div class="node-section">SECTION 12 · ALERT SYSTEM</div>
+        <div class="node-title">AlertSystem.evaluate()</div>
+        <div class="node-desc">Checks confirmed tracks each frame. If threshold met and cooldown expired, fires alert. Manages active alert state and history.</div>
+        <div class="node-tags">
+          <span class="tag-pill accent3">CONFIRMED tracks</span>
+          <span class="tag-pill">cooldown timer</span>
+          <span class="tag-pill">logging</span>
+        </div>
+      </div>
+
+      <div class="node output" style="max-width:280px; flex:1">
+        <div class="node-section">SECTION 13 · DETECTION LOGGER</div>
+        <div class="node-title">DetectionLogger</div>
+        <div class="node-desc">Writes detection rows to CSV log. Writes position data to separate CSV. Saves annotated frame images to disk on confirmed detection.</div>
+        <div class="node-tags">
+          <span class="tag-pill accent2">CSV log</span>
+          <span class="tag-pill accent2">cv2.imwrite</span>
+          <span class="tag-pill">datetime</span>
+        </div>
+      </div>
+
+      <div class="node sys" style="max-width:280px; flex:1">
+        <div class="node-section">SECTION 14 · SYSTEM MONITOR</div>
+        <div class="node-title">SystemMonitor</div>
+        <div class="node-desc">Background thread polls tegrastats every second. Provides GPU%, CPU%, RAM%, temperature to HUD overlay.</div>
+        <div class="node-tags">
+          <span class="tag-pill sys">tegrastats</span>
+          <span class="tag-pill">subprocess</span>
+          <span class="tag-pill">regex</span>
+        </div>
+      </div>
+
+    </div>
+
+
+    <!-- ═══════════════════════════════════════════════════ -->
+    <div class="phase-label" style="margin-top:40px">05 — SHUTDOWN</div>
+
+    <div class="row center">
+      <div class="node core wide">
+        <div class="node-section">SECTION 18 · SIGNAL HANDLER</div>
+        <div class="node-title">Ctrl+C or SIGTERM → graceful_shutdown()</div>
+        <div class="node-desc">Registered OS signal handler intercepts termination signals and routes to clean shutdown instead of abrupt kill.</div>
+        <div class="node-tags"><span class="tag-pill">signal</span><span class="tag-pill">sys</span></div>
+      </div>
+    </div>
+
+    <div class="connector">
+      <svg width="2" height="20"><line x1="1" y1="0" x2="1" y2="20" stroke="#1e2a38" stroke-width="2" stroke-dasharray="3,3"/></svg>
+    </div>
+
+    <div class="row center">
+      <div class="node core wide">
+        <div class="node-section">SECTION 15.10 · PIPELINE STOP</div>
+        <div class="node-title">DetectionPipeline.stop() — Ordered Shutdown Sequence</div>
+        <div class="node-desc">① Stop camera processing threads &nbsp;② Stop CSICamera threads, release VideoCapture &nbsp;③ Stop SystemMonitor &nbsp;④ Destroy all OpenCV windows &nbsp;⑤ Finalize CSV logs &nbsp;⑥ Generate session report</div>
+        <div class="node-tags">
+          <span class="tag-pill">threading.join()</span>
+          <span class="tag-pill cv">cap.release()</span>
+          <span class="tag-pill cv">cv2.destroyAllWindows()</span>
+          <span class="tag-pill accent2">session report</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="connector">
+      <svg width="2" height="20"><line x1="1" y1="0" x2="1" y2="20" stroke="#1e2a38" stroke-width="2" stroke-dasharray="3,3"/></svg>
+    </div>
+
+    <div class="row center">
+      <div class="node output wide" style="text-align:center">
+        <div class="node-section">SECTION 13.5 · FINAL OUTPUT</div>
+        <div class="node-title">generate_session_report()</div>
+        <div class="node-desc">Reads CSV log and writes JSON summary: session duration · total detections · unique track count · average confidence · detections per camera · average estimated distance · total alerts fired</div>
+        <div class="node-tags" style="justify-content:center">
+          <span class="tag-pill accent2">JSON report</span>
+          <span class="tag-pill accent2">pandas</span>
+          <span class="tag-pill">csv</span>
+          <span class="tag-pill">datetime</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- footer -->
+    <div style="margin-top:56px; padding-top:20px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+      <div style="font-family:'Share Tech Mono',monospace; font-size:10px; color:var(--muted);">
+        DRONE_DETECTION_SYSTEM_V1 &nbsp;·&nbsp; JETSON NANO ORIN &nbsp;·&nbsp; 19 SECTIONS &nbsp;·&nbsp; SINGLE FILE
+      </div>
+      <div style="font-family:'Share Tech Mono',monospace; font-size:10px; color:var(--muted);">
+        YOLOv11 + TensorRT + OpenCV + Kalman Filter + SciPy
+      </div>
+    </div>
+
+  </div><!-- /flow -->
+</div><!-- /page -->
+</body>
+</html>

@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drone Detection — System Flow</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #f5f2eb;
+    font-family: 'IBM Plex Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 60px 24px 80px;
+  }
+
+  .page {
+    width: 100%;
+    max-width: 560px;
+  }
+
+  /* ── Header ── */
+  .header {
+    margin-bottom: 52px;
+    border-left: 3px solid #111;
+    padding-left: 16px;
+  }
+  .header .eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 8px;
+  }
+  .header h1 {
+    font-size: 22px;
+    font-weight: 600;
+    color: #111;
+    line-height: 1.3;
+  }
+  .header h1 span { color: #c0392b; }
+
+  /* ── Flow container ── */
+  .flow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  /* ── Stage block ── */
+  .stage {
+    width: 100%;
+    background: #fff;
+    border: 1.5px solid #ddd;
+    border-radius: 4px;
+    padding: 20px 24px;
+    position: relative;
+  }
+
+  .stage-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: #aaa;
+    letter-spacing: 1px;
+    margin-bottom: 5px;
+  }
+
+  .stage-title {
+    font-size: 17px;
+    font-weight: 600;
+    color: #111;
+    margin-bottom: 6px;
+  }
+
+  .stage-desc {
+    font-size: 13px;
+    color: #666;
+    line-height: 1.6;
+    font-weight: 300;
+  }
+
+  .stage-lib {
+    margin-top: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .lib {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 3px 9px;
+    border-radius: 2px;
+    background: #f5f2eb;
+    color: #555;
+    border: 1px solid #ddd;
+  }
+
+  /* Color left-border accents */
+  .stage.s1 { border-left: 4px solid #2c3e50; }
+  .stage.s2 { border-left: 4px solid #2980b9; }
+  .stage.s3 { border-left: 4px solid #c0392b; }
+  .stage.s4 { border-left: 4px solid #27ae60; }
+  .stage.s5 { border-left: 4px solid #8e44ad; }
+  .stage.s6 { border-left: 4px solid #2980b9; }
+  .stage.s7 { border-left: 4px solid #e67e22; }
+  .stage.s8 { border-left: 4px solid #16a085; }
+  .stage.s9 { border-left: 4px solid #2c3e50; }
+
+  .lib.blue   { color: #2980b9; border-color: #aecfe8; background: #eef5fb; }
+  .lib.red    { color: #c0392b; border-color: #e8b4ae; background: #fdf0ee; }
+  .lib.green  { color: #27ae60; border-color: #aedfbf; background: #eefbf3; }
+  .lib.purple { color: #8e44ad; border-color: #d4b0e8; background: #f7eefb; }
+  .lib.orange { color: #e67e22; border-color: #f0d0ae; background: #fdf5ee; }
+  .lib.teal   { color: #16a085; border-color: #a0d8cf; background: #eef8f6; }
+
+  /* ── Arrow ── */
+  .arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 0;
+    gap: 0;
+  }
+  .arrow-shaft {
+    width: 1.5px;
+    height: 28px;
+    background: #bbb;
+  }
+  .arrow-head {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 7px solid #bbb;
+  }
+  .arrow-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: #aaa;
+    letter-spacing: 1px;
+    margin: 4px 0 2px;
+  }
+
+  /* ── Loop indicator ── */
+  .loop-wrap {
+    width: 100%;
+    position: relative;
+  }
+  .loop-brace {
+    position: absolute;
+    left: -28px;
+    top: 0;
+    bottom: 0;
+    width: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+  .loop-line {
+    position: absolute;
+    left: 16px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, #e8c84a, #e8c84a);
+    border-radius: 2px;
+  }
+  .loop-top, .loop-bottom {
+    position: absolute;
+    left: 16px;
+    width: 16px;
+    height: 2px;
+    background: #e8c84a;
+  }
+  .loop-top { top: 0; }
+  .loop-bottom { bottom: 0; }
+  .loop-tag {
+    position: absolute;
+    left: -2px;
+    top: 50%;
+    transform: translateY(-50%) rotate(-90deg);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    color: #c8a800;
+    letter-spacing: 2px;
+    white-space: nowrap;
+    background: #f5f2eb;
+    padding: 2px 4px;
+  }
+
+  /* ── Parallel split ── */
+  .parallel {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+  .split-line {
+    display: flex;
+    align-items: flex-end;
+    width: 70%;
+    height: 20px;
+    position: relative;
+  }
+  .split-line::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 1.5px;
+    height: 20px;
+    background: #bbb;
+  }
+  .split-line::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 1.5px;
+    background: #bbb;
+  }
+  .split-cols {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .split-col-arrow {
+    display: flex;
+    justify-content: center;
+    padding: 4px 0;
+  }
+  .merge-line {
+    display: flex;
+    align-items: flex-start;
+    width: 70%;
+    height: 20px;
+    position: relative;
+  }
+  .merge-line::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    width: 1.5px;
+    height: 20px;
+    background: #bbb;
+  }
+  .merge-line::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; top: 0;
+    height: 1.5px;
+    background: #bbb;
+  }
+
+  /* mini stage for parallel columns */
+  .mini-stage {
+    background: #fff;
+    border: 1.5px solid #ddd;
+    border-radius: 4px;
+    padding: 14px 16px;
+  }
+  .mini-stage.blue  { border-left: 4px solid #2980b9; }
+  .mini-stage.green { border-left: 4px solid #27ae60; }
+
+  .mini-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111;
+    margin-bottom: 4px;
+  }
+  .mini-desc {
+    font-size: 11px;
+    color: #888;
+    line-height: 1.5;
+    font-weight: 300;
+  }
+
+  /* ── Side processes box ── */
+  .side-box {
+    width: 100%;
+    border: 1.5px dashed #ccc;
+    border-radius: 4px;
+    padding: 16px 20px;
+    background: #fafafa;
+  }
+  .side-box-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #aaa;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .side-items {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .side-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: #555;
+  }
+  .side-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    margin-top: 48px;
+    padding-top: 16px;
+    border-top: 1px solid #ddd;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: #bbb;
+    letter-spacing: 1px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="eyebrow">EE Senior Project · Jetson Nano Orin</div>
+    <h1>Drone Detection &<br><span>Tracking System</span> — Flow</h1>
+  </div>
+
+  <div class="flow">
+
+    <!-- 1. STARTUP -->
+    <div class="stage s1">
+      <div class="stage-num">01</div>
+      <div class="stage-title">Startup & Initialization</div>
+      <div class="stage-desc">Parse CLI arguments. Run system checks (GPU, cameras, model file). Instantiate all components. Load TensorRT model and run warmup.</div>
+      <div class="stage-lib">
+        <span class="lib">argparse</span>
+        <span class="lib blue">torch.cuda</span>
+        <span class="lib red">ultralytics</span>
+        <span class="lib blue">cv2</span>
+      </div>
+    </div>
+
+    <div class="arrow">
+      <div class="arrow-shaft"></div>
+      <div class="arrow-head"></div>
+    </div>
+
+    <!-- 2. CAMERA CAPTURE -->
+    <div class="stage s2">
+      <div class="stage-num">02</div>
+      <div class="stage-title">Dual Camera Capture</div>
+      <div class="stage-desc">Two background threads continuously capture frames from both CSI cameras via GStreamer pipelines. Latest frames always ready in thread-safe buffers.</div>
+      <div class="stage-lib">
+        <span class="lib blue">cv2 · GStreamer</span>
+        <span class="lib">threading</span>
+        <span class="lib">numpy</span>
+      </div>
+    </div>
+
+    <div class="arrow">
+      <div class="arrow-shaft"></div>
+      <div class="arrow-head"></div>
+    </div>
+
+    <!-- LOOP BLOCK: steps 3–6 -->
+    <div style="width:100%; position:relative; padding-left:36px;">
+
+      <!-- loop indicator -->
+      <div style="position:absolute; left:0; top:0; bottom:0; width:28px;">
+        <div style="position:absolute; left:14px; top:0; bottom:0; width:2px; background:#e8c84a; border-radius:2px;"></div>
+        <div style="position:absolute; left:14px; top:0; width:14px; height:2px; background:#e8c84a;"></div>
+        <div style="position:absolute; left:14px; bottom:0; width:14px; height:2px; background:#e8c84a;"></div>
+        <div style="position:absolute; left:0; top:50%; transform:translateY(-50%) rotate(-90deg); font-family:'IBM Plex Mono',monospace; font-size:9px; color:#c8a800; letter-spacing:2px; white-space:nowrap; background:#f5f2eb; padding:2px 4px;">LOOP</div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; align-items:center; gap:0;">
+
+        <!-- 3. DETECTION -->
+        <div class="stage s3" style="width:100%">
+          <div class="stage-num">03</div>
+          <div class="stage-title">YOLO Detection</div>
+          <div class="stage-desc">Each frame passed to YOLOv11 TensorRT model. Returns bounding boxes, confidence scores, and class labels for all detected drones.</div>
+          <div class="stage-lib">
+            <span class="lib red">ultralytics · YOLO</span>
+            <span class="lib red">TensorRT FP16</span>
+            <span class="lib">CUDA GPU</span>
+          </div>
+        </div>
+
+        <div class="arrow">
+          <div class="arrow-shaft"></div>
+          <div class="arrow-head"></div>
+        </div>
+
+        <!-- 4. TRACKING -->
+        <div class="stage s4" style="width:100%">
+          <div class="stage-num">04</div>
+          <div class="stage-title">Tracking & Kalman Filter</div>
+          <div class="stage-desc">Detections matched to existing tracks using Hungarian algorithm. Kalman filter predicts drone position when temporarily not detected. Each drone assigned a persistent Track ID.</div>
+          <div class="stage-lib">
+            <span class="lib green">KalmanFilter</span>
+            <span class="lib green">scipy · Hungarian</span>
+            <span class="lib">numpy</span>
+          </div>
+        </div>
+
+        <div class="arrow">
+          <div class="arrow-shaft"></div>
+          <div class="arrow-head"></div>
+        </div>
+
+        <!-- 5. POSITION -->
+        <div class="stage s5" style="width:100%">
+          <div class="stage-num">05</div>
+          <div class="stage-title">Position Estimation</div>
+          <div class="stage-desc">Bounding box converted to azimuth & elevation angles. Distance estimated from apparent drone size. Both cameras compared for stereo triangulation.</div>
+          <div class="stage-lib">
+            <span class="lib purple">math · atan2</span>
+            <span class="lib purple">stereo disparity</span>
+            <span class="lib">numpy</span>
+          </div>
+        </div>
+
+        <div class="arrow">
+          <div class="arrow-shaft"></div>
+          <div class="arrow-head"></div>
+        </div>
+
+        <!-- 6. VISUALIZATION -->
+        <div class="stage s6" style="width:100%">
+          <div class="stage-num">06</div>
+          <div class="stage-title">Visualization & Display</div>
+          <div class="stage-desc">Draws bounding boxes, track IDs, velocity arrows, trajectory trails, and position data onto both frames. Combines into unified side-by-side display with HUD overlay.</div>
+          <div class="stage-lib">
+            <span class="lib blue">cv2.rectangle</span>
+            <span class="lib blue">cv2.putText</span>
+            <span class="lib blue">cv2.imshow</span>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /loop block -->
+
+    <div class="arrow">
+      <div class="arrow-shaft"></div>
+      <div class="arrow-head"></div>
+    </div>
+
+    <!-- 7. ALERTS & LOGGING -->
+    <div class="stage s7">
+      <div class="stage-num">07</div>
+      <div class="stage-title">Alerts & Logging</div>
+      <div class="stage-desc">Confirmed tracks trigger alerts with cooldown logic. All detections, positions, and track data written to CSV logs. Annotated images saved to disk on detection.</div>
+      <div class="stage-lib">
+        <span class="lib orange">CSV · JSON logs</span>
+        <span class="lib blue">cv2.imwrite</span>
+        <span class="lib">logging</span>
+        <span class="lib">datetime</span>
+      </div>
+    </div>
+
+    <div class="arrow">
+      <div class="arrow-shaft"></div>
+      <div class="arrow-head"></div>
+    </div>
+
+    <!-- 8. SHUTDOWN -->
+    <div class="stage s9">
+      <div class="stage-num">08</div>
+      <div class="stage-title">Shutdown & Report</div>
+      <div class="stage-desc">Ctrl+C triggers graceful shutdown. All threads stopped, cameras released, windows destroyed. Session report generated with detection summary statistics.</div>
+      <div class="stage-lib">
+        <span class="lib">signal · sys</span>
+        <span class="lib blue">cv2.destroyAllWindows</span>
+        <span class="lib teal">pandas · JSON report</span>
+      </div>
+    </div>
+
+    <!-- SIDE PROCESSES -->
+    <div style="margin-top: 40px; width:100%">
+      <div class="side-box">
+        <div class="side-box-title">// Running in parallel throughout</div>
+        <div class="side-items">
+          <div class="side-item">
+            <div class="side-dot" style="background:#16a085"></div>
+            <span><strong>System Monitor</strong> — polls GPU, CPU, RAM, temperature via tegrastats every second</span>
+          </div>
+          <div class="side-item">
+            <div class="side-dot" style="background:#2980b9"></div>
+            <span><strong>Camera Threads</strong> — two independent capture loops always running in background</span>
+          </div>
+          <div class="side-item">
+            <div class="side-dot" style="background:#e67e22"></div>
+            <span><strong>Alert Watchdog</strong> — monitors confirmed track count and fires alerts independently</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /flow -->
+
+  <div class="footer">
+    YOLOv11 · TensorRT · OpenCV · Kalman Filter · Jetson Nano Orin
+  </div>
+
+</div>
+</body>
+</html>
