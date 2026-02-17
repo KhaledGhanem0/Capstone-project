@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Technology Hierarchy</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0f0a;
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+  }
+
+  /* subtle grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(74,222,128,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(74,222,128,0.03) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events: none;
+  }
+
+  .card {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 640px;
+  }
+
+  /* ── Each nested layer ── */
+  .layer {
+    border-radius: 6px;
+    padding: 22px 22px 22px 22px;
+    position: relative;
+  }
+
+  /* Layer title row */
+  .layer-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .layer-title {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  .layer-badge {
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 3px;
+    opacity: 0.7;
+  }
+
+  /* Bullet notes */
+  .notes {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 16px;
+    padding-left: 4px;
+  }
+
+  .note {
+    font-size: 12px;
+    font-weight: 300;
+    line-height: 1.5;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .note::before {
+    content: '—';
+    flex-shrink: 0;
+    opacity: 0.5;
+    margin-top: 1px;
+  }
+
+  /* Pill tags */
+  .pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+
+  .pill {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 4px 10px;
+    border-radius: 3px;
+    letter-spacing: 0.5px;
+  }
+
+  /* ════════════════════════
+     LAYER 1 — AI  (outermost)
+  ════════════════════════ */
+  .l-ai {
+    background: #0d1a0d;
+    border: 1.5px solid #1a3a1a;
+  }
+  .l-ai .layer-title  { color: #4ade80; }
+  .l-ai .layer-badge  { background: rgba(74,222,128,0.1); color: #4ade80; border: 1px solid rgba(74,222,128,0.2); }
+  .l-ai .note         { color: #6b8f6b; }
+  .l-ai .pill         { background: rgba(74,222,128,0.08); color: #4ade80; border: 1px solid rgba(74,222,128,0.18); }
+
+  /* ════════════════════════
+     LAYER 2 — ML
+  ════════════════════════ */
+  .l-ml {
+    background: #0d1f12;
+    border: 1.5px solid #1e4a28;
+  }
+  .l-ml .layer-title  { color: #34d399; }
+  .l-ml .layer-badge  { background: rgba(52,211,153,0.1); color: #34d399; border: 1px solid rgba(52,211,153,0.2); }
+  .l-ml .note         { color: #5a8a70; }
+  .l-ml .pill         { background: rgba(52,211,153,0.08); color: #34d399; border: 1px solid rgba(52,211,153,0.18); }
+
+  /* ════════════════════════
+     LAYER 3 — Deep Learning
+  ════════════════════════ */
+  .l-dl {
+    background: #0d2018;
+    border: 1.5px solid #1e4a38;
+  }
+  .l-dl .layer-title  { color: #2dd4bf; }
+  .l-dl .layer-badge  { background: rgba(45,212,191,0.1); color: #2dd4bf; border: 1px solid rgba(45,212,191,0.2); }
+  .l-dl .note         { color: #4a8a80; }
+  .l-dl .pill         { background: rgba(45,212,191,0.08); color: #2dd4bf; border: 1px solid rgba(45,212,191,0.18); }
+
+  /* ════════════════════════
+     LAYER 4 — Computer Vision
+  ════════════════════════ */
+  .l-cv {
+    background: #0d1e2a;
+    border: 1.5px solid #1e3e5a;
+  }
+  .l-cv .layer-title  { color: #38bdf8; }
+  .l-cv .layer-badge  { background: rgba(56,189,248,0.1); color: #38bdf8; border: 1px solid rgba(56,189,248,0.2); }
+  .l-cv .note         { color: #4a7a9a; }
+  .l-cv .pill         { background: rgba(56,189,248,0.08); color: #38bdf8; border: 1px solid rgba(56,189,248,0.18); }
+
+  /* ════════════════════════
+     LAYER 5 — YOLO (innermost)
+  ════════════════════════ */
+  .l-yolo {
+    background: #1a1020;
+    border: 1.5px solid #3a2060;
+  }
+  .l-yolo .layer-title  { color: #c084fc; }
+  .l-yolo .layer-badge  { background: rgba(192,132,252,0.1); color: #c084fc; border: 1px solid rgba(192,132,252,0.2); }
+  .l-yolo .note         { color: #7a5a9a; }
+  .l-yolo .pill         { background: rgba(192,132,252,0.08); color: #c084fc; border: 1px solid rgba(192,132,252,0.18); }
+
+  /* corner bracket decoration */
+  .layer::before {
+    content: '';
+    position: absolute;
+    top: 8px; left: 8px;
+    width: 12px; height: 12px;
+    border-top: 1.5px solid currentColor;
+    border-left: 1.5px solid currentColor;
+    opacity: 0.25;
+    border-radius: 2px 0 0 0;
+  }
+  .layer::after {
+    content: '';
+    position: absolute;
+    bottom: 8px; right: 8px;
+    width: 12px; height: 12px;
+    border-bottom: 1.5px solid currentColor;
+    border-right: 1.5px solid currentColor;
+    opacity: 0.25;
+    border-radius: 0 0 2px 0;
+  }
+  .l-ai::before, .l-ai::after   { color: #4ade80; }
+  .l-ml::before, .l-ml::after   { color: #34d399; }
+  .l-dl::before, .l-dl::after   { color: #2dd4bf; }
+  .l-cv::before, .l-cv::after   { color: #38bdf8; }
+  .l-yolo::before, .l-yolo::after { color: #c084fc; }
+
+  /* separator line before nested child */
+  .child-sep {
+    height: 1px;
+    margin: 4px 0 14px 0;
+    opacity: 0.15;
+  }
+  .l-ai   .child-sep { background: #4ade80; }
+  .l-ml   .child-sep { background: #34d399; }
+  .l-dl   .child-sep { background: #2dd4bf; }
+  .l-cv   .child-sep { background: #38bdf8; }
+
+  /* ── Footer ── */
+  .footer {
+    margin-top: 20px;
+    text-align: center;
+    font-size: 10px;
+    color: #2a3a2a;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+
+  <!-- ═══════ LAYER 1: AI ═══════ -->
+  <div class="layer l-ai">
+    <div class="layer-header">
+      <span class="layer-title">Artificial Intelligence</span>
+      <span class="layer-badge">AI</span>
+    </div>
+
+    <div class="notes">
+      <div class="note">Broad field of making machines simulate human intelligence</div>
+      <div class="note">Includes rule-based systems, search, planning, reasoning, and learning</div>
+    </div>
+
+    <div class="pills">
+      <span class="pill">Decision Making</span>
+      <span class="pill">Natural Language</span>
+      <span class="pill">Robotics</span>
+      <span class="pill">Expert Systems</span>
+    </div>
+
+    <div class="child-sep"></div>
+
+    <!-- ═══════ LAYER 2: ML ═══════ -->
+    <div class="layer l-ml">
+      <div class="layer-header">
+        <span class="layer-title">Machine Learning</span>
+        <span class="layer-badge">ML</span>
+      </div>
+
+      <div class="notes">
+        <div class="note">Algorithms that learn patterns from data without explicit programming</div>
+        <div class="note">Models improve automatically through experience and training</div>
+      </div>
+
+      <div class="pills">
+        <span class="pill">scikit-learn</span>
+        <span class="pill">XGBoost</span>
+        <span class="pill">Random Forest</span>
+        <span class="pill">SVM</span>
+      </div>
+
+      <div class="child-sep"></div>
+
+      <!-- ═══════ LAYER 3: Deep Learning ═══════ -->
+      <div class="layer l-dl">
+        <div class="layer-header">
+          <span class="layer-title">Deep Learning</span>
+          <span class="layer-badge">DL</span>
+        </div>
+
+        <div class="notes">
+          <div class="note">ML using multi-layer Artificial Neural Networks (ANN)</div>
+          <div class="note">Learns hierarchical features automatically from raw data</div>
+          <div class="note">Requires large datasets and significant compute (GPU)</div>
+        </div>
+
+        <div class="pills">
+          <span class="pill">PyTorch</span>
+          <span class="pill">TensorFlow</span>
+          <span class="pill">Keras</span>
+          <span class="pill">ONNX</span>
+          <span class="pill">CUDA</span>
+          <span class="pill">cuDNN</span>
+        </div>
+
+        <div class="child-sep"></div>
+
+        <!-- ═══════ LAYER 4: Computer Vision ═══════ -->
+        <div class="layer l-cv">
+          <div class="layer-header">
+            <span class="layer-title">Computer Vision</span>
+            <span class="layer-badge">CV</span>
+          </div>
+
+          <div class="notes">
+            <div class="note">Enables machines to interpret and understand visual data</div>
+            <div class="note">Tasks: classification, object detection, segmentation, tracking</div>
+            <div class="note">Operates on images and video frames as numerical arrays</div>
+          </div>
+
+          <div class="pills">
+            <span class="pill">OpenCV</span>
+            <span class="pill">GStreamer</span>
+            <span class="pill">Pillow</span>
+            <span class="pill">NumPy</span>
+            <span class="pill">Albumentations</span>
+          </div>
+
+          <div class="child-sep"></div>
+
+          <!-- ═══════ LAYER 5: YOLO ═══════ -->
+          <div class="layer l-yolo">
+            <div class="layer-header">
+              <span class="layer-title">YOLO</span>
+              <span class="layer-badge">v11</span>
+            </div>
+
+            <div class="notes">
+              <div class="note">You Only Look Once — real-time object detection via CNN</div>
+              <div class="note">Single-pass architecture: detects objects in one forward pass</div>
+              <div class="note">Outputs bounding boxes, class labels, and confidence scores</div>
+              <div class="note">Optimized for edge devices via TensorRT export (FP16)</div>
+            </div>
+
+            <div class="pills">
+              <span class="pill">Ultralytics</span>
+              <span class="pill">TensorRT</span>
+              <span class="pill">CUDA</span>
+              <span class="pill">cuDNN</span>
+              <span class="pill">CNN</span>
+              <span class="pill">FP16</span>
+              <span class="pill">JetPack</span>
+            </div>
+
+          </div><!-- /yolo -->
+
+        </div><!-- /cv -->
+
+      </div><!-- /dl -->
+
+    </div><!-- /ml -->
+
+  </div><!-- /ai -->
+
+  <div class="footer">Drone Detection & Tracking System · EE Senior Project</div>
+
+</div>
+
+</body>
+</html>
